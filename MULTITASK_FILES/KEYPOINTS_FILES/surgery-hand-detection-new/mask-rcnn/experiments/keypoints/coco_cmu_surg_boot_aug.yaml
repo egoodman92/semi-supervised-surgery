@@ -1,0 +1,29 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "../../models/cmu_final.pth"
+  RESNETS:
+    DEPTH: 50
+  ROI_HEADS:
+    BATCH_SIZE_PER_IMAGE: 512
+    NUM_CLASSES: 1
+    NMS_THRESH_TEST: 0.7
+    SCORE_THRESH_TEST: 0.7
+  ROI_KEYPOINT_HEAD:
+    NUM_KEYPOINTS: 21
+  FREEZE: false
+SOLVER:
+  STEPS: (210000, 250000)
+  IMS_PER_BATCH: 2
+  BASE_LR: 0.00025
+  MAX_ITER: 250000
+  CHECKPOINT_PERIOD: 5000
+DATASETS:
+  TRAIN: ("train_boot_aug", )
+  TEST: ("val_validated",)
+TEST:
+  EVAL_PERIOD: 1000
+  KEYPOINT_ALPHAS: [0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+DATALOADER:
+  NUM_WORKERS: 5
+  FILTER_EMPTY_ANNOTATIONS: true
+OUTPUT_DIR: "./keypoints_coco_cmu_surg_boot_aug"

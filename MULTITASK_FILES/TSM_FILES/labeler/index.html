@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <!--[if IE]><meta http-equiv="X-UA-Compatible" content="IE=edge" /><![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Video segment labeler
+    </title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <script src="annotations.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <!-- Custom CSS -->
+    <style>
+        body {
+            padding-top: 80px;
+            /* Required padding for .navbar-fixed-top. Remove if using .navbar-static-top. Change if height of navigation changes. */
+        }
+        .navbar-inverse {
+
+        }
+        .navbar-inverse .navbar-brand {
+            color:#fff;
+        }
+        .navbar-brand{
+            font-size:20px;
+            font-weight:300;
+        }
+        .btn-default.labeler, .btn-default.next-prev{
+            width: 120px;
+        }
+        .video-and-metadata p{
+            font-size:17px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+
+
+<!-- Navigation -->
+<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+
+    <div class="container">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header">
+            <a class="navbar-brand" href="#">Video segment labeler</a>
+        </div>
+    </div>
+    <!-- /.container -->
+</nav>
+
+<!-- Page Content -->
+<div class="container">
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="" style="width:640px;  float: none; margin: 0 auto;">
+
+                <div class="video-and-metadata">
+
+                    <h1 id="video-title">--</h1>
+
+                    <div id="player"></div>
+
+
+                    <table class="table">
+                        <tbody>
+                        <tr>
+                            <td>Duration: <span id="segment-duration">--</span></td>
+                            <td style="text-align: right"><a id="download" style="cursor: pointer;">Download <span id="label-count">0</span> labeled records</a></td>
+                        </tr>
+                        <tr>
+                            <td>Timespan: <span id="segment-timespan">--</span></td>
+                            <td style="text-align: right">Label section: <span id="segment-label">--</span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+
+
+                <div class="form-group" style="margin-left:15px;">
+                    <button class="btn btn-default labeler" type="button" id="cutting">Cutting</button>
+                    <button class="btn btn-default labeler" type="button" id="tying">Tying</button>
+                    <button class="btn btn-default labeler" type="button" id="suturing">Suturing</button>
+                    <button class="btn btn-default labeler" type="button" id="none">None</button>
+                    <button class="btn btn-default labeler" type="button" id="abstain">Abstain</button>
+                </div>
+
+                <div class="form-group" style="margin-left:15px;">
+                    <button class="btn btn-default next-prev" type="button" style="visibility: hidden" id="prev">Prev</button>
+                    <button class="btn btn-default next-prev" type="button" style="visibility: hidden">--</button>
+                    <button class="btn btn-default next-prev" type="button" style="visibility: hidden">--</button>
+                    <button class="btn btn-default next-prev" type="button" style="visibility: hidden">--</button>
+                    <button class="btn btn-default next-prev" type="button" id="next">Next</button>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+    <div class="col-xs-12" style="height:100px;"></div>
+
+</div>
+
+
+
+
+
+<script src="https://code.jquery.com/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+
+
+<script>
+    function deepCopy(jsonObject){
+        return JSON.parse(JSON.stringify(jsonObject));
+    }
+
+
+    function saveData(data, fileName) {
+        var a = document.createElement("a");
+        document.body.appendChild(a);
+        a.style = "display: none";
+
+        var json = JSON.stringify(data),
+            blob = new Blob([json], {type: "text/plain;charset=utf-8"}),
+            url = window.URL.createObjectURL(blob);
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+    function saveAnnotations(newAnnotations){
+        saveData(newAnnotations, 'annotations.json');
+    }
+    function fmtMSS(s){
+        return(s-(s%=60))/60+(9<s?':':':0')+s;
+    }
+
+
+    // 2. This code loads the IFrame Player API code asynchronously.
+    var tag = document.createElement('script');
+
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // 3. This function creates an <iframe> (and YouTube player)
+    //    after the API code downloads.
+    var player;
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('player', {
+            height: '390',
+            width: '640',
+            videoId: annotations.videos[videoIndex].name,
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange
+            }
+        });
+    }
+
+    // 4. The API will call this function when the video player is ready.
+    function onPlayerReady(event) {
+        //event.target.playVideo();
+        loadCurrentSegment();
+        loadSegmentMetadata();
+    }
+
+    // 5. The API calls this function when the player's state changes.
+    //    The function indicates that when playing a video (state=1),
+    //    the player should play for six seconds and then stop.
+    var done = false;
+    function onPlayerStateChange(event) {
+        if (event.data == YT.PlayerState.PLAYING && !done) {
+            setTimeout(stopVideo, 6000);
+            done = true;
+        }
+    }
+    function stopVideo() {
+        player.stopVideo();
+    }
+
+    function loadSegmentMetadata(){
+        // Temporary youtube api key
+        var ytApiKey = "AIzaSyCYqJ6rEU6AtQW4Friv5Hly0pYIylhARso";
+        var videoId = segment.videoId;
+
+        $("#segment-duration").html(parseInt(segment.seconds[1] - segment.seconds[0]) + " seconds");
+        $("#segment-label").html(segment.label);
+        $("#label-count").html(parseInt(labeledSegments.length));
+
+        timespan = fmtMSS(segment.seconds[0]) + "-" + fmtMSS(segment.seconds[1]);
+        $("#segment-timespan").html(timespan);
+
+        $.get("https://www.googleapis.com/youtube/v3/videos?part=snippet&id=" + videoId + "&key=" + ytApiKey, function(data) {
+            $("#video-title").html(data.items[0].snippet.title)
+        });
+    }
+
+    function categoryIdForLabel(label){
+        var i;
+        for(i in annotations.categories){
+            category = annotations.categories[i];
+            if(category.name === label){
+                return category.id;
+            }
+        }
+        return -1;
+    }
+
+    function labelForCategoryId(categoryId){
+        var i;
+        for(i in annotations.categories){
+            category = annotations.categories[i];
+            if(category.id === categoryId){
+                return category.name;
+            }
+        }
+        return "abstain";
+    }
+
+    function segmentExists(){
+        for(i in labeledSegments){
+            if(labeledSegments[i].id === segment.id){
+                return true
+            }
+        }
+        return false;
+    }
+
+    function labelSegment(segment, label){
+        segment.label = label;
+        segment.category_id = categoryIdForLabel(label);
+        if(!segmentExists()){
+            labeledSegments.push(segment);
+        }
+    }
+
+    function getSegment(){
+        video =  annotations.videos[videoIndex];
+        ann = video.anns[annIndex];
+        duration = ann.seconds[1] - ann.seconds[0];
+        if(segmentIndex * maxSegmentLength >= duration){
+            annIndex += 1;
+            if(annIndex >= video.anns.length){
+                videoIndex += 1;
+                annIndex = 0;
+            }
+            segmentIndex = 0
+        }
+        video =  annotations.videos[videoIndex];
+        ann = video.anns[annIndex];
+
+        startSeconds = ann.seconds[0] + segmentIndex * maxSegmentLength;
+        remainingDuration = ann.seconds[1] - startSeconds;
+
+        if(remainingDuration < maxSegmentLength){
+            endSeconds = ann.seconds[1];
+        }else{
+            endSeconds = startSeconds + maxSegmentLength;
+        }
+        segmentId = video.name + "?" + parseInt(startSeconds) + "-" + parseInt(endSeconds);
+        segment = {"videoId":video.name, "annotation_index":annIndex, "seconds":[startSeconds, endSeconds],
+                    "category_id":ann.category_id, "label": labelForCategoryId(ann.category_id),
+                    "id":segment};
+        return segment;
+    }
+
+    function getNextSegment(){
+        segmentIndex += 1;
+        return getSegment();
+    }
+
+    function loadCurrentSegment(){
+        player.loadVideoById({videoId:segment.videoId,
+            startSeconds:segment.seconds[0],
+            endSeconds:segment.seconds[1]});
+        loadSegmentMetadata();
+    }
+
+    var maxSegmentLength = 10;
+    var videoIndex = 0;
+    var annIndex = 0;
+    var segmentIndex = 0;
+    var labeledSegments = [];
+    var segment = getSegment();
+    var labelsDownloaded = 0;
+
+    $(document).ready(function() {
+        $("#download").click(function(){
+            saveData(labeledSegments, "labels.json");
+            labelsDownloaded = labeledSegments.length;
+        });
+
+        $("button.next-prev").click(function(){
+            segment = getNextSegment();
+            loadCurrentSegment();
+            $("button.labeler").css("background-color", "transparent");
+
+        });
+
+        $("button.labeler").click(function(){
+            timeLeft = segment.seconds[1] - player.getCurrentTime();
+
+            label = $(this).attr('id');
+            labelSegment(segment, label);
+
+            $("button.labeler").css("background-color", "transparent");
+            $(this).css("background-color", "#ddd");
+
+            $("#label-count").html(parseInt(labeledSegments.length));
+        });
+
+        $(window).bind('beforeunload', function(){
+            if(labelsDownloaded < labeledSegments.length){
+                return 'Download labeled data before leaving';
+            }
+            return undefined;
+        });
+    });
+
+</script>
+
+</body>
+
+</html>

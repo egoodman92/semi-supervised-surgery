@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <!--[if IE]><meta http-equiv="X-UA-Compatible" content="IE=edge" /><![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        Video segment viewer
+    </title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+    <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+    <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+<!--    <script src="annotations.js"></script>-->
+    <script src="ann_train.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <!-- Custom CSS -->
+    <style>
+        body {
+            padding-top: 80px;
+            /* Required padding for .navbar-fixed-top. Remove if using .navbar-static-top. Change if height of navigation changes. */
+        }
+        .navbar-inverse {
+
+        }
+        .navbar-inverse .navbar-brand {
+            color:#fff;
+        }
+        .navbar-brand{
+            font-size:20px;
+            font-weight:300;
+        }
+        .btn-default.labeler, .btn-default.next-prev{
+            width: 120px;
+        }
+        .video-and-metadata p{
+            font-size:17px;
+        }
+        .next, .prev{
+            cursor:pointer;
+            /*display:block;*/
+            color: #555;
+            font-size:20px;
+            position:relative;
+            top:1px;
+        }
+        .prev{
+            margin-right: 5px;
+        }
+        .next{
+            margin-left: 5px;
+        }
+
+        .loader {
+            border: 1px solid #f3f3f3; /* Light grey */
+            border-top: 1px solid #999; /* Blue */
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            animation: spin 2s linear infinite;
+            display: block;
+            /*right: 50%; !* or: left: 50%; *!*/
+            margin-top: -20px; /* have of the elements height */
+            margin-left: 18px; /* have of the elements widht */
+
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+</head>
+
+<body>
+
+
+
+<!-- Navigation -->
+<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+
+    <div class="container">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header">
+            <a class="navbar-brand" href="#">Video segment viewer</a>
+        </div>
+    </div>
+    <!-- /.container -->
+</nav>
+
+<!-- Page Content -->
+<div class="container">
+
+    <div class="row">
+        <div class="col-lg-12 videos-container">
+
+            <div class="col-lg-3 col-md-6 video-box1" style="" >
+                <h4 class="video-title">Cutting</h4>
+                <div class="video-and-metadata">
+                    <div class="embed-responsive embed-responsive-16by9">
+                        <div id="player1" class="player"></div>
+                    </div>
+                    <table class="table">
+                        <tbody>
+                        <tr>
+                            <td>
+                                <span style="cursor: pointer;" class="next-prev prev-click">
+                                <i style="" class="fa fa-angle-left prev"></i> <span id="segment-duration" class="segment-duration"><i style="" class="fa fa-circle-notch loader"></i></span>
+                                </span>
+                            </td>
+                            <td style="text-align: right">
+                                <span style="cursor: pointer;" class="next-prev next-click"><span id="segment-timespan" class="segment-timespan">--</span>
+                                    <i style="" class="fa fa-angle-right next"></i>
+                                </span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12" style="height:100px;"></div>
+
+</div>
+
+
+
+<script src="https://code.jquery.com/jquery.min.js"></script><script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+<script>
+    String.prototype.capitalize = function() {
+        return this.charAt(0).toUpperCase() + this.slice(1);
+    };
+
+    function saveData(data, fileName) {
+        var a = document.createElement("a");
+        document.body.appendChild(a);
+        a.style = "display: none";
+
+        var json = JSON.stringify(data),
+            blob = new Blob([json], {type: "text/plain;charset=utf-8"}),
+            url = window.URL.createObjectURL(blob);
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+    function saveAnnotations(newAnnotations){
+        saveData(newAnnotations, 'annotations.json');
+    }
+    function fmtMSS(s){
+        return(s-(s%=60))/60+(9<s?':':':0')+s;
+    }
+
+    // 2. This code loads the IFrame Player API code asynchronously.
+    var tag = document.createElement('script');
+
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // 3. This function creates an <iframe> (and YouTube player)
+    //    after the API code downloads.
+    var player;
+    var players = {};
+    function onYouTubeIframeAPIReady() {
+        numPlayers = $(".videos-container").children().length;
+        for (i = 0; i < numPlayers; i++) {
+            var playerId = 'player' + parseInt(i+1);
+            var player_ = createNewYoutubePlayer(playerId);
+            players[playerId] = player_;
+        }
+        player = players['player1'];
+    }
+
+    function createNewYoutubePlayer(playerId){
+        var newPlayer = new YT.Player(playerId, {
+            height: '195',
+            width: '320',
+            // height: '312',
+            // width: '512',
+            videoId: annotations.videos[videoIndex].name,
+            events: {
+                'onReady': onPlayerReady,
+                'onStateChange': onPlayerStateChange
+            },
+            playerVars: {
+                mute: 1
+            },
+            playbackRate: 2.0
+        });
+        return newPlayer;
+    }
+
+    // 4. The API will call this function when the video player is ready.
+    function onPlayerReady(event) {
+        //event.target.playVideo();
+        var playerId = idForPlayer(event.target);
+        label = labelForPlayerId[playerId];
+        //loadSegment(players[playerId], segmentByLabel[label][0]);
+    }
+
+    // 5. The API calls this function when the player's state changes.
+    //    The function indicates that when playing a video (state=1),
+    //    the player should play for six seconds and then stop.
+    var done = false;
+    function onPlayerStateChange(event) {
+        if (event.data === YT.PlayerState.ENDED) {
+            //player.playVideo();
+            // go to next video.
+            playNextSegment(event.target);
+        }
+    }
+
+    function playPrevSegment(player){
+        playSegment(player, -1);
+    }
+
+    function playNextSegment(player){
+        playSegment(player, 1);
+    }
+
+    function playSegment(player, offset){
+        var playerId = idForPlayer(player);
+        label = labelForPlayerId[playerId];
+        currentSegments[label].index = (segmentByLabel[label].length + currentSegments[label].index + offset) % segmentByLabel[label].length;
+        currentSegments[label].segment = segmentByLabel[label][currentSegments[label].index];
+        loadSegment(players[playerId], currentSegments[label].segment);
+    }
+
+    function stopVideo() {
+        //player.stopVideo();
+    }
+
+    function idForPlayer(player){
+        return $(player.getIframe()).attr('id');
+    }
+
+    function videoBoxClassForPlayer(player){
+        var playerId = idForPlayer(player);
+        return playerId.replace("player", "video-box");
+    }
+
+    function loadSegmentMetadata(player, segment){
+        // Temporary youtube api key
+        var ytApiKey = "AIzaSyCYqJ6rEU6AtQW4Friv5Hly0pYIylhARso";
+        var videoId = segment.videoId;
+        var videoBoxClass = videoBoxClassForPlayer(player);
+        $("." + videoBoxClass + " .segment-duration").html(parseInt(segment.seconds[1] - segment.seconds[0]) + " seconds");
+        timespan = fmtMSS(segment.seconds[0]) + "-" + fmtMSS(segment.seconds[1]);
+        $("." + videoBoxClass + " .segment-timespan").html(timespan);
+        // $.get("https://www.googleapis.com/youtube/v3/videos?part=snippet&id=" + videoId + "&key=" + ytApiKey, function(data) {
+        //     $("#video-title").html(data.items[0].snippet.title)
+        // });
+    }
+
+    function categoryIdForLabel(label){
+        var i;
+        for(i in annotations.categories){
+            category = annotations.categories[i];
+            if(category.name === label){
+                return category.id;
+            }
+        }
+        return -1;
+    }
+
+    function labelForCategoryId(categoryId){
+        var i;
+        for(i in annotations.categories){
+            category = annotations.categories[i];
+            if(category.id === categoryId){
+                return category.name;
+            }
+        }
+        return "abstain";
+    }
+
+    function segmentExists(){
+        for(i in labeledSegments){
+            if(labeledSegments[i].id === segment.id){
+                return true
+            }
+        }
+        return false;
+    }
+
+    function labelSegment(segment, label){
+        segment.label = label;
+        segment.category_id = categoryIdForLabel(label);
+        if(!segmentExists()){
+            labeledSegments.push(segment);
+        }
+    }
+
+    function nextAvailableSegmentIndex(segmentTripleIndex){
+        videoIndex_ = segmentTripleIndex[0];
+        annIndex_ = segmentTripleIndex[1];
+        segmentIndex_ = segmentTripleIndex[2];
+
+        video = annotations.videos[videoIndex_];
+        console.log("videos: ")
+        console.log(video);
+
+        if(video === undefined){
+            return null;
+        }
+        while(video.anns.length === 0){
+            videoIndex_ += 1;
+            annIndex_ = 0;
+            segmentIndex_ = 0;
+            video = annotations.videos[videoIndex_];
+        }
+        ann = video.anns[annIndex_];
+        duration = ann.seconds[1] - ann.seconds[0];
+        if(segmentIndex_ * maxSegmentLength >= duration){
+            annIndex_ += 1;
+            if(annIndex_ >= video.anns.length){
+                videoIndex_ += 1;
+                annIndex_ = 0;
+            }
+            segmentIndex_ = 0
+        }
+        return [videoIndex_, annIndex_, segmentIndex_];
+    }
+
+    function createSegmentDict(videoId, startSeconds, endSeconds, label, annIndex){
+        var segmentId = videoId + "?" + parseInt(startSeconds) + "-" + parseInt(endSeconds);
+        var categoryId = categoryIdForLabel(label);
+        return {"videoId":videoId, "annotation_index":annIndex, "seconds":[startSeconds, endSeconds],
+            "category_id":categoryId, "label": label, "id":segmentId};
+    }
+
+    function getSegment(segmentTripleIndex){
+        var segmentTripleIndex_ = nextAvailableSegmentIndex(segmentTripleIndex);
+        if(segmentTripleIndex_ === null){
+            return null;
+        }
+        var videoIndex_ = segmentTripleIndex_[0];
+        var annIndex_ = segmentTripleIndex_[1];
+        var segmentIndex_ = segmentTripleIndex_[2];
+
+        if(videoIndex_ >= annotations.videos.length){
+            return null;
+        }
+        var video = annotations.videos[videoIndex_];
+        var ann = video.anns[annIndex_];
+
+        var startSeconds = ann.seconds[0] + segmentIndex_ * maxSegmentLength;
+        var remainingDuration = ann.seconds[1] - startSeconds;
+        var endSeconds;
+        if(remainingDuration < maxSegmentLength){
+            endSeconds = ann.seconds[1];
+        }else{
+            endSeconds = startSeconds + maxSegmentLength;
+        }
+        var label = labelForCategoryId(ann.category_id);
+        return createSegmentDict(video.name, startSeconds, endSeconds, label, annIndex_);
+    }
+
+    var allSegments = [];
+    function getSegmentsByLabel(){
+        console.log(annotations);
+        var segmentTripleIndex = [0,0,0];
+        var segmentsByLabel = {};
+        while(true){
+            var segment_ = getSegment(segmentTripleIndex);
+            if(segment_ === null){
+                break;
+            }
+            allSegments.push(segment_);
+            if(!(segment_.label in segmentsByLabel)){
+                segmentsByLabel[segment_.label] = [];
+            }
+            segmentsByLabel[segment_.label].push(segment_);
+
+            segmentTripleIndex[2] += 1;
+            segmentTripleIndex = nextAvailableSegmentIndex(segmentTripleIndex);
+            if(segmentTripleIndex === null){
+                break;
+            }
+        }
+
+        var i;
+        var backgroundSegmentLength = 10;
+        var maxBackgroundSegments = 50;
+        var backgroundSegments = [];
+        var totalLabeledSeconds = 0;
+
+        for(i in allSegments){
+            segment1 = allSegments[i];
+            totalLabeledSeconds += segment1.seconds[1] - segment1.seconds[0];
+            if(backgroundSegments.length >= maxBackgroundSegments || i >= allSegments.length - 1){
+                break;
+            }
+
+            segment2 = allSegments[parseInt(i)+1];
+            var gap = segment2.seconds[0] - segment1.seconds[1];
+
+            if(segment1.videoId == segment2.videoId){
+
+                if(gap > backgroundSegmentLength){
+                    var segment = createSegmentDict(segment1.videoId, segment1.seconds[1], segment1.seconds[1] + backgroundSegmentLength,
+                        'background', segment1.annotation_index);
+                    backgroundSegments.push(segment);
+                }
+            }
+        }
+        var totalVideosDuration = 0;
+        i = 0;
+        for(i in annotations.videos){
+            video = annotations.videos[i];
+            totalVideosDuration += video.duration;
+        }
+        var segmentStats = {'total_seconds': totalLabeledSeconds,
+            'num_segments':allSegments.length,
+            'total_video_duration':totalVideosDuration,
+            'segments': allSegments
+        };
+        //saveData(segmentStats, 'data.json');
+        segmentsByLabel['background'] = backgroundSegments;
+        return segmentsByLabel;
+    }
+
+    function loadSegment(player, segment_){
+        player.loadVideoById({videoId:segment_.videoId,
+            startSeconds:segment_.seconds[0],
+            endSeconds:segment_.seconds[1]});
+        loadSegmentMetadata(player, segment_);
+    }
+
+    function layout(){
+        var i = 0;
+        var label;
+        for(label in segmentByLabel){
+            i += 1;
+            if(i > 1){
+                var videoBox = $(".video-box1").clone();
+                videoBox.appendTo(".videos-container");
+                var boxClass = "video-box" + parseInt(i);
+                videoBox.addClass(boxClass).removeClass('video-box1');
+                $("." + boxClass + " .player").attr("id", "player" + parseInt(i));
+                $("." + boxClass + " .video-title").html(label.capitalize());
+            }
+        }
+    }
+
+    function onStart(){
+        segmentByLabel = getSegmentsByLabel();
+        currentSegments = {};
+        for(label in segmentByLabel){
+            currentSegments[label] = {'index':0, 'segment': segmentByLabel[0]}
+        }
+        layout();
+
+        setTimeout(function () {
+            loadSegment(players['player1'], segmentByLabel['cutting'][0]);
+            loadSegment(players['player2'], segmentByLabel['tying'][0]);
+            loadSegment(players['player3'], segmentByLabel['suturing'][0]);
+            loadSegment(players['player4'], segmentByLabel['background'][0]);
+        }, 2000);
+    }
+
+    var segmentByLabel;
+    var maxSegmentLength = 10000;
+    var videoIndex = 0;
+    var annIndex = 0;
+    var segmentIndex = 0;
+    var labeledSegments = [];
+    var segment = getSegment([videoIndex, annIndex, segmentIndex]);
+    var labelsDownloaded = 0;
+    var labelForPlayerId = {
+        'player1':'cutting',
+        'player2':'tying',
+        'player3':'suturing',
+        'player4':'background'
+    };
+
+    var currentSegments;
+
+    $(document).ready(function() {
+        onStart();
+        $("#download").click(function(){
+            saveData(labeledSegments, "labels.json");
+            labelsDownloaded = labeledSegments.length;
+        });
+
+        $(".next-prev").click(function(){
+            var $div = $(this).closest('div[class*="video-box"]');
+            var className = $div.attr('class').split(' ')[1];
+            playerId = className.replace('video-box', 'player');
+            player = players[playerId];
+            if($(this).hasClass('next-click') === true) {
+                playNextSegment(player);
+            }else{
+                playPrevSegment(player);
+            }
+        });
+
+        $("button.labeler").click(function(){
+            timeLeft = segment.seconds[1] - player.getCurrentTime();
+
+            label = $(this).attr('id');
+            labelSegment(segment, label);
+
+            $("button.labeler").css("background-color", "transparent");
+            $(this).css("background-color", "#ddd");
+
+            $("#label-count").html(parseInt(labeledSegments.length));
+        });
+
+        $(window).bind('beforeunload', function(){
+            if(labelsDownloaded < labeledSegments.length){
+                return 'Download labeled data before leaving';
+            }
+            return undefined;
+        });
+    });
+
+</script>
+
+</body>
+
+</html>

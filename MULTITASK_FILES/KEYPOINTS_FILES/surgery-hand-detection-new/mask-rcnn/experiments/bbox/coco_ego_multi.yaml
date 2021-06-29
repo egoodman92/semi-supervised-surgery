@@ -1,0 +1,26 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "../../models/egohands_final.pth"
+  MASK_ON: False
+  RESNETS:
+    DEPTH: 50
+  ROI_HEADS:
+    BATCH_SIZE_PER_IMAGE: 512
+    NUM_CLASSES: 4
+    NMS_THRESH_TEST: 0.7
+    SCORE_THRESH_TEST: 0.7
+SOLVER:
+  STEPS: (210000, 250000)
+  IMS_PER_BATCH: 2
+  BASE_LR: 0.00025
+  MAX_ITER: 50000
+  CHECKPOINT_PERIOD: 1000
+DATASETS:
+  TRAIN: ("train_multi",)
+  TEST: ("val_multi",)
+TEST:
+  EVAL_PERIOD: 1000
+DATALOADER:
+  NUM_WORKERS: 5
+  AUG: ''
+OUTPUT_DIR: "../../coco_ego_multi"

@@ -1,0 +1,17 @@
+_BASE_: "../Base-RCNN-FPN.yaml"
+MODEL:
+  WEIGHTS: "../../models/bbox_final.pth"
+  RESNETS:
+    DEPTH: 50
+  ROI_HEADS:
+    BATCH_SIZE_PER_IMAGE: 512
+    NUM_CLASSES: 1
+    NMS_THRESH_TEST: 0.5
+    SCORE_THRESH_TEST: 0.5
+DATASETS:
+  TRAIN: ("train_validated",)
+  TEST: ("val_validated",)
+DATALOADER:
+  NUM_WORKERS: 5
+  AUG: ''
+OUTPUT_DIR: "../../final_bbox"

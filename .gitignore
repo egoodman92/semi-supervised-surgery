@@ -1,0 +1,11 @@
+data/images/
+data/videos/
+logs/
+runs/
+*.pth
+*.mp4
+*.pkl
+*.json
+*.jpg
+
+.ipynb_checkpoints

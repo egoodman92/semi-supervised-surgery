@@ -1,0 +1,83 @@
+"""
+Script for converting json annotations in to csv format for training
+Only takes into consideration tool boundary boxes
+"""
+import csv
+import json
+import imagesize
+import argparse
+from pathlib import Path
+
+DATA_DIR = str(Path(__file__).resolve().parents[1]) + "/data"
+DEFAULT_CSV = DATA_DIR + "/raw_data.csv"
+
+SAIL_IMAGES_PATH = "/pasteur/u/kkpatel/data/images/"
+SAIL_JSON_PATH = "/pasteur/u/kkpatel/data/complete_data.json"
+
+LOCAL_IMAGES_PATH = "/Users/stephenren/code/curis2020/MARVLous_surgery_annotator/src/images/"
+LOCAL_JSON_PATH = DATA_DIR + "/raw_data.json"
+
+
+def get_coordinates(position, img_width, img_height):
+    left = position["left"]
+    top = position["top"]
+    width = position["width"]
+    height = position["height"]
+    x1 = int(float(left) * img_width)
+    y1 = int(float(top) * img_height)
+    x2 = int((float(left) + float(width)) * img_width)
+    y2 = int((float(top) + float(height)) * img_height)
+
+    return [str(x1), str(y1), str(x2), str(y2)]
+
+
+def convert(images_path, json_path):
+    jf = open(json_path)
+    cf = open(DEFAULT_CSV, 'w')
+    filewriter = csv.writer(cf, delimiter=',')
+
+    json_data = json.load(jf)['data']
+
+    for data in json_data:
+        if data["object_type"] == "image" and "tool_labels" in data:
+            filename = data["name"]
+            img_width, img_height = imagesize.get(images_path + filename)
+
+            for tool_label in data["tool_labels"]:
+                line = [images_path + filename]
+                line += get_coordinates(tool_label["bounding_box_position"], img_width, img_height)
+                line.append(tool_label["category"])
+                filewriter.writerow(line)
+
+            # Case were tools are not present in the image - add negative label
+            if len(data["tool_labels"]) == 0:
+                filewriter.writerow([images_path + filename, '', '', '', '', ''])
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Script to convert data into csv format for pytorch-retinanet.')
+
+    parser.add_argument('--datapath', help='Path to json annotations')
+    parser.add_argument('--imagepath', help='Path to image directory')
+    parser.add_argument('--useLocal', help='Use pre-loaded LOCAL_IMAGES_PATH (check convert_data.py)', action="store_true")
+
+    args, leftover = parser.parse_known_args()
+
+    images_path = SAIL_IMAGES_PATH
+    json_path = SAIL_JSON_PATH
+
+    if args.imagepath is not None:
+        images_path = args.imagepath
+
+    if args.datapath is not None:
+        json_path = args.datapath
+
+    if args.useLocal:
+        images_path = LOCAL_IMAGES_PATH
+        json_path = LOCAL_JSON_PATH
+
+    convert(images_path, json_path)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,32 @@
+import argparse
+
+from retinanet import csv_eval
+from retinanet.dataloader import CSVDataset, Resizer, Normalizer, Augmenter
+from torchvision import transforms
+
+def main(args=None):
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--model_name')
+    parser.add_argument('--val_path')
+    parser.add_argument('--train_path')
+    parser.add_argument('--class_path')
+
+    args, leftover = parser.parse_known_args()
+
+    model_name = 'model'
+    if parser.model_name is not None:
+        model_name = parser.model_name
+
+    dataset_train = CSVDataset(train_file=parser.train_path, class_list=parser.class_path,
+                               transform=transforms.Compose([Normalizer(), Augmenter(), Resizer()]))
+
+    retinanet = torch.load(parser.model)
+
+    print('Evaluating train:')
+    csv_eval.evaluate(dataset_train, retinanet)
+
+    print('Evaluating val:')
+    csv_eval.evaluate(dataset_val, retinanet)
+
+    
